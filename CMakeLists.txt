@@ -20,7 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+catkin_python_setup()
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -132,10 +132,20 @@ include_directories(
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(PROGRAMS
+  nodes/set_basename_and_path.py
+  nodes/tracker_simplebuffer.py
+  nodes/data_association.py
+  nodes/image_processing.py
+  nodes/save_data_to_hdf5.py
+  nodes/liveviewer.py
+  nodes/delta_video_player.py
+  nodes/delta_video_simplebuffer.py
+  nodes/record_user_input.py
+  nodes/republish_pref_obj_data.py
+  nodes/save_bag.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS multi_tracker multi_tracker_node

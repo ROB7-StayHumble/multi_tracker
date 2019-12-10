@@ -1,8 +1,8 @@
-/multi_tracker/1/tracker/image_topic: '/camera/image_raw'
+/multi_tracker/1/tracker/image_topic: '/ircam_data'
 /multi_tracker/1/tracker/threshold: 6
 /multi_tracker/1/tracker/backgroundupdate: 0
 /multi_tracker/1/tracker/medianbgupdateinterval: 0
-/multi_tracker/1/tracker/camera_encoding: 'mono8'
+/multi_tracker/1/tracker/camera_encoding: 'bgr8'
 /multi_tracker/1/tracker/min_persistence_to_draw: 10
 /multi_tracker/1/tracker/max_frames_to_draw: 50
 /multi_tracker/1/tracker/erode: 2

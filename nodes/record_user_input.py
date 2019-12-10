@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 This node records mouse clicks and keypresses to a csv file. Requires a image topic feed - though that requirement could be relaxed in the future.
@@ -60,7 +60,7 @@ class ImageGUI(object):
         if event == cv2.EVENT_LBUTTONDOWN:
             data = ['EVENT_LBUTTONDOWN', rospy.get_time(), x, y, 'nokey']
             self.datawrite.writerow(data)
-            print data
+            print(data)
         if event == cv2.EVENT_MOUSEMOVE:
             self.mouse_position = [x,y]
             
@@ -69,7 +69,7 @@ class ImageGUI(object):
         x,y = self.mouse_position
         data = ['KEYPRESS', rospy.get_time(), x, y, key]
         self.datawrite.writerow(data)
-        print data
+        print(data)
     
 if __name__ == '__main__':
     

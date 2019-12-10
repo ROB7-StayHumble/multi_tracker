@@ -1,12 +1,9 @@
 from distutils.core import setup
+from catkin_pkg.python_setup import generate_distutils_setup
 
-setup(
-name='MultiTrackerAnalysis',
-version='0.0.1',
-author='Floris van Breugel',
-author_email='floris@caltech.edu',
-packages = ['multi_tracker_analysis'],
-license='BSD',
-description='Analysis scripts for data collected with multi tracker',
-long_description=open('README.md').read(),
+# fetch values from package.xml
+setup_args = generate_distutils_setup(
+    packages=['multi_tracker_analysis','fly_plot_lib'],
+    package_dir={'': '.'},
 )
+setup(**setup_args)

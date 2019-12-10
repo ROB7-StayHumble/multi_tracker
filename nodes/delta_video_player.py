@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import division
 import roslib
 import rospy
@@ -37,13 +37,13 @@ import matplotlib.pyplot as plt
 
 
 from distutils.version import LooseVersion, StrictVersion
-print 'Using open cv: ' + cv2.__version__
+print('Using open cv: ' + cv2.__version__)
 if StrictVersion(cv2.__version__.split('-')[0]) >= StrictVersion("3.0.0"):
     OPENCV_VERSION = 3
-    print 'Open CV 3'
+    print('Open CV 3')
 else:
     OPENCV_VERSION = 2
-    print 'Open CV 2'
+    print('Open CV 2')
 
 # The main tracking class, a ROS node
 class DeCompressor:
@@ -131,7 +131,7 @@ class DeCompressor:
         rospy.spin()
         if self.videowriter is not None:
             self.videowriter.release()
-            print "Note: use this command to make a mac / quicktime friendly video: avconv -i test.avi -c:v libx264 -c:a copy outputfile.mp4"
+            print("Note: use this command to make a mac / quicktime friendly video: avconv -i test.avi -c:v libx264 -c:a copy outputfile.mp4")
 #####################################################################################################
     
 if __name__ == '__main__':
