@@ -19,6 +19,8 @@ from multi_tracker.srv import resetBackgroundService
 from utils.boxes import *
 from utils.img_utils import *
 from persondetection.run_yolo import *
+from connected_components.connectedcomponents import *
+from utils.transformbox import get_box_zedframe
 
 import time, os
 
@@ -35,7 +37,7 @@ if StrictVersion(cv2.__version__.split('-')[0]) >= StrictVersion("3.0.0"):
 else:
     OPENCV_VERSION = 2
     print('Open CV 2')
-    
+
 ###########################################################################################################
 # Incredibly basic image processing function (self contained), to demonstrate the format custom image processing functions should follow
 #######################
@@ -49,16 +51,16 @@ def incredibly_basic(self):
         reset_background(self)
         self.reset_background_flag = False
         return
-      
+
     self.absdiff = cv2.absdiff(np.float32(self.imgScaled), self.backgroundImage)
     self.imgproc = copy.copy(self.imgScaled)
-    
+
     retval, self.threshed = cv2.threshold(self.absdiff, self.params['threshold'], 255, 0)
-    
+
     # convert to gray if necessary
     if len(self.threshed.shape) == 3:
         self.threshed = np.uint8(cv2.cvtColor(self.threshed, cv2.COLOR_BGR2GRAY))
-    
+
     # extract and publish contours
     # http://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contour_features/py_contour_features.html
     if OPENCV_VERSION == 2:
@@ -66,13 +68,13 @@ def incredibly_basic(self):
     elif OPENCV_VERSION == 3:
         self.threshed = np.uint8(self.threshed)
         contours, hierarchy = cv2.findContours(self.threshed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+
     try:
         header  = Header(stamp=self.framestamp,frame_id=str(self.framenumber))
     except:
         header  = Header(stamp=None,frame_id=str(self.framenumber))
         print('could not get framestamp, run tracker_nobuffer instead')
-        
+
     contour_info = []
     for contour in contours:
         if len(contour) > 5: # Large objects are approximated by an ellipse
@@ -82,7 +84,7 @@ def incredibly_basic(self):
             b /= 2.
             ecc = np.min((a,b)) / np.max((a,b))
             area = np.pi*a*b
-            
+
             data = Contourinfo()
             data.header  = header
             data.dt      = dtCamera
@@ -91,14 +93,14 @@ def incredibly_basic(self):
             data.area    = area
             data.angle   = angle
             data.ecc     = ecc
-            
+
             contour_info.append(data)
-            
+
         else: # Small ones get ignored
             pass
-            
+
     # publish the contours
-    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )  
+    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )
 
 
 ###########################################################################################################
@@ -113,7 +115,7 @@ def is_point_below_line(point, slope, intercept):
         return False
     else:
         return True
-    
+
 def fit_ellipse_to_contour(self, contour):
     ellipse = cv2.fitEllipse(contour)
     (x,y), (a,b), angle = ellipse
@@ -129,7 +131,7 @@ def fit_ellipse_to_contour(self, contour):
         if moments is not None:
             x, y, area = moments
     return x, y, ecc, area, angle
-    
+
 def get_centroid_from_moments(contour):
     M = cv2.moments(contour)
     if M['m00'] != 0:
@@ -139,7 +141,7 @@ def get_centroid_from_moments(contour):
         return cx, cy, area
     else:
         return None
-        
+
 def add_data_to_contour_info(x,y,ecc,area,angle,dtCamera,header):
     # Prepare to publish the contour info
     # contour message info: dt, x, y, angle, area, ecc
@@ -152,26 +154,26 @@ def add_data_to_contour_info(x,y,ecc,area,angle,dtCamera,header):
     data.angle   = angle
     data.ecc     = ecc
     return data
-    
+
 def extract_and_publish_contours(self):
     if OPENCV_VERSION == 2:
         contours, hierarchy = cv2.findContours(self.threshed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     elif OPENCV_VERSION == 3:
         contours, hierarchy = cv2.findContours(self.threshed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # http://docs.opencv.org/trunk/doc/py_tutorials/py_imgproc/py_contours/py_contour_features/py_contour_features.html
-    
+
     try:
         header  = Header(stamp=self.framestamp,frame_id=str(self.framenumber))
     except:
         header  = Header(stamp=None,frame_id=str(self.framenumber))
         print('could not get framestamp, run tracker_nobuffer instead')
-        
+
     contour_info = []
     for contour in contours:
         # Large objects are approximated by an ellipse
         if len(contour) > 5:
             x, y, ecc, area, angle = fit_ellipse_to_contour(self, contour)
-            
+
             # if object is too large, split it in two, this helps with colliding objects, but is not 100% correct
             if area > self.params['max_expected_area']:
                 slope = np.tan(angle)
@@ -186,13 +188,13 @@ def extract_and_publish_contours(self):
                         c2.append([point])
                 c1 = np.array(c1)
                 c2 = np.array(c2)
-                
+
                 if len(c1) > 5:
                     x, y, ecc, area, angle = fit_ellipse_to_contour(self, np.array(c1))
                     if area < self.params['max_size'] and area > self.params['min_size']:
                         data = add_data_to_contour_info(x,y,ecc,area,angle,self.dtCamera,header)
                         contour_info.append(data)
-                
+
                 if len(c2) > 5:
                     x, y, ecc, area, angle = fit_ellipse_to_contour(self, np.array(c2))
                     if area < self.params['max_size'] and area > self.params['min_size']:
@@ -202,26 +204,26 @@ def extract_and_publish_contours(self):
                 if area < self.params['max_size'] and area > self.params['min_size']:
                     data = add_data_to_contour_info(x,y,ecc,area,angle,self.dtCamera,header)
                     contour_info.append(data)
-            
-            
+
+
         # Small ones just get a point
         else:
             area = 0
-            
+
     # publish the contours
-    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )  
+    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )
 
     return
 
 def convert_to_gray_if_necessary(self):
     if len(self.threshed.shape) == 3:
         self.threshed = np.uint8(cv2.cvtColor(self.threshed, cv2.COLOR_BGR2GRAY))
-        
+
 def erode_and_dialate(self):
     kernel = np.ones((3,3), np.uint8)
     self.threshed = cv2.dilate(self.threshed, kernel, iterations=self.params['dilate'])
     self.threshed = cv2.erode(self.threshed, kernel, iterations=self.params['erode'])
-    
+
 def reset_background_if_difference_is_very_large(self, color='dark'):
     if color == 'dark':
         # if the thresholded absolute difference is too large, reset the background
@@ -238,7 +240,7 @@ def reset_background(self):
     filename = self.experiment_basename + '_' + time.strftime("%Y%m%d_%H%M%S_bgimg_N" + self.nodenum, time.localtime()) + '.png'
     home_directory = os.path.expanduser( rospy.get_param('/multi_tracker/' + self.nodenum + '/data_directory') )
     filename = os.path.join(home_directory, filename)
-    
+
     try:
         cv2.imwrite(filename, self.backgroundImage) # requires opencv > 2.4.9
         print('Background reset: ', filename)
@@ -254,7 +256,7 @@ def add_image_to_background(self, color='dark'):
     filename = self.experiment_basename + '_' + time.strftime("%Y%m%d_%H%M%S_bgimg_N" + self.nodenum, time.localtime()) + '.png'
     home_directory = os.path.expanduser( rospy.get_param('/multi_tracker/' + self.nodenum + '/data_directory') )
     filename = os.path.join(home_directory, filename)
-    
+
     try:
         cv2.imwrite(filename, self.backgroundImage) # requires opencv > 2.4.9
         print('Background reset: ', filename)
@@ -275,21 +277,21 @@ def background_subtraction(self):
         reset_background(self)
         self.reset_background_flag = False
         return
-      
-    # Absdiff, threshold, and contours       
-    # cv2.RETR_EXTERNAL only extracts the outer most contours - good for speed, and most simple objects 
+
+    # Absdiff, threshold, and contours
+    # cv2.RETR_EXTERNAL only extracts the outer most contours - good for speed, and most simple objects
     self.absdiff = cv2.absdiff(np.float32(self.imgScaled), self.backgroundImage)
     self.imgproc = copy.copy(self.imgScaled)
     # running background update
     cv2.accumulateWeighted(np.float32(self.imgScaled), self.backgroundImage, self.params['backgroundupdate']) # this needs to be here, otherwise there's an accumulation of something in the background
-    
+
     retval, self.threshed = cv2.threshold(self.absdiff, self.params['threshold'], 255, 0)
 
     convert_to_gray_if_necessary(self)
     erode_and_dialate(self)
     extract_and_publish_contours(self)
     reset_background_if_difference_is_very_large(self)
-        
+
 ###########################################################################################################
 # Only track dark or light objects
 #########################
@@ -309,7 +311,7 @@ def dark_or_light_objects_only(self, color='dark'):
             self.image_mask = np.zeros_like(self.imgScaled)
             cv2.circle(self.image_mask,(self.params['circular_mask_x'], self.params['circular_mask_y']),int(self.params['circular_mask_r']),[1,1,1],-1)
         self.imgScaled = self.image_mask*self.imgScaled
-        
+
     # If there is no background image, grab one, and move on to the next frame
     if self.backgroundImage is None:
         reset_background(self)
@@ -321,9 +323,9 @@ def dark_or_light_objects_only(self, color='dark'):
     if self.add_image_to_background_flag:
         add_image_to_background(self, color)
         self.add_image_to_background_flag = False
-        return 
-    
-    
+        return
+
+
     if self.params['backgroundupdate'] != 0:
         cv2.accumulateWeighted(np.float32(self.imgScaled), self.backgroundImage, self.params['backgroundupdate']) # this needs to be here, otherwise there's an accumulation of something in the background
     if self.params['medianbgupdateinterval'] != 0:
@@ -346,7 +348,7 @@ def dark_or_light_objects_only(self, color='dark'):
         kern_d = self.params['morph_open_kernel_size']
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kern_d,kern_d))
         self.kernel = kernel
-    
+
     if color == 'dark':
         self.threshed = cv2.compare(np.float32(self.imgScaled), self.backgroundImage-self.params['threshold'], cv2.CMP_LT) # CMP_LT is less than
     elif color == 'light':
@@ -358,12 +360,12 @@ def dark_or_light_objects_only(self, color='dark'):
         dark = cv2.compare(np.float32(self.imgScaled), self.backgroundImage-self.params['threshold'], cv2.CMP_LT) # CMP_LT is less than
         light = cv2.compare(np.float32(self.imgScaled), self.backgroundImage+self.params['threshold'], cv2.CMP_GT) # CMP_GT is greater than
         self.threshed = dark+light
-    
+
     convert_to_gray_if_necessary(self)
-    
+
     # noise removal
     self.threshed = cv2.morphologyEx(self.threshed,cv2.MORPH_OPEN, kernel, iterations = 1)
-    
+
     # sure background area
     #sure_bg = cv2.dilate(opening,kernel,iterations=3)
 
@@ -374,21 +376,21 @@ def dark_or_light_objects_only(self, color='dark'):
 
     # Finding unknown region
     #sure_fg = np.uint8(sure_fg)
-    
+
     #self.threshed = sure_fg
     erode_and_dialate(self)
 
     # publish the processed image
     c = cv2.cvtColor(np.uint8(self.threshed), cv2.COLOR_GRAY2BGR)
     # commented for now, because publishing unthresholded difference
-    
+
     #if OPENCV_VERSION == 2: # cv bridge not compatible with open cv 3, at least at this time
     img = self.cvbridge.cv2_to_imgmsg(c, 'bgr8') # might need to change to bgr for color cameras
     self.pubProcessedImage.publish(img)
-    
+
     extract_and_publish_contours(self)
     #reset_background_if_difference_is_very_large(self, color)
-    
+
 def yolo_boxes(self):
 
     try:
@@ -398,18 +400,24 @@ def yolo_boxes(self):
         print('could not get framestamp, run tracker_nobuffer instead')
 
     self.imgproc = copy.copy(self.imgScaled)
+    img_1channel = self.imgproc[:,:,0]
     ir_yolo_img, ir_yolo_boxes = detect_from_img(self.imgproc)
-    
+    #ir_cc_thresh_img, ir_cc_grad_img, ir_cc_boxes = detect_connected_components_updated(img_1channel)
+
+    boxes = ir_yolo_boxes
+    showimg = ir_yolo_img
+
     contour_info = []
-    for box in ir_yolo_boxes:
+    for box in boxes:
         print(box)
         box_class = Box(blank_ir_3D, xyxy=box['coords'], confidence=1)
-        data = add_data_to_contour_info(box_class.x,box_class.y,2,box_class.h*box_class.w,0,self.dtCamera,header)
-        contour_info.append(data)
+        box_zed_class = get_box_zedframe(box_class)
+        if box_zed_class.score > 0.7:
+            data = add_data_to_contour_info(box_class.x,box_class.y,box_class.h/box_class.w,box_class.h*box_class.w,0,self.dtCamera,header)
+            contour_info.append(data)
 
-    img = self.cvbridge.cv2_to_imgmsg(ir_yolo_img, 'bgr8') # might need to change to bgr for color cameras
-    
+    img = self.cvbridge.cv2_to_imgmsg(showimg, 'bgr8') # might need to change to bgr for color cameras
+
     self.pubProcessedImage.publish(img)
     #extract_and_publish_contours(self)
-    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )  
-        
+    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )
