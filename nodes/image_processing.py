@@ -411,10 +411,10 @@ def yolo_boxes(self):
     for box in boxes:
         print(box)
         box_class = Box(blank_ir_3D, xyxy=box['coords'], confidence=1)
-        box_zed_class = get_box_zedframe(box_class)
-        if box_zed_class.score > 0.7:
-            data = add_data_to_contour_info(box_class.x,box_class.y,box_class.h/box_class.w,box_class.h*box_class.w,0,self.dtCamera,header)
-            contour_info.append(data)
+        # box_zed_class = get_box_zedframe(box_class)
+        # if box_zed_class.score > 0:
+        data = add_data_to_contour_info(box_class.x,box_class.y,box_class.h/box_class.w,box_class.h*box_class.w,0,self.dtCamera,header)
+        contour_info.append(data)
 
     img = self.cvbridge.cv2_to_imgmsg(showimg, 'bgr8') # might need to change to bgr for color cameras
 
