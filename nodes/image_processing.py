@@ -16,6 +16,10 @@ from multi_tracker.msg import Contourinfo, Contourlist
 from multi_tracker.msg import Trackedobject, Trackedobjectlist
 from multi_tracker.srv import resetBackgroundService
 
+from utils.boxes import *
+from utils.img_utils import *
+from persondetection.run_yolo import *
+
 import time, os
 
 from distutils.version import LooseVersion, StrictVersion
@@ -384,4 +388,28 @@ def dark_or_light_objects_only(self, color='dark'):
     
     extract_and_publish_contours(self)
     #reset_background_if_difference_is_very_large(self, color)
+    
+def yolo_boxes(self):
+
+    try:
+        header  = Header(stamp=self.framestamp,frame_id=str(self.framenumber))
+    except:
+        header  = Header(stamp=None,frame_id=str(self.framenumber))
+        print('could not get framestamp, run tracker_nobuffer instead')
+
+    self.imgproc = copy.copy(self.imgScaled)
+    ir_yolo_img, ir_yolo_boxes = detect_from_img(self.imgproc)
+    
+    contour_info = []
+    for box in ir_yolo_boxes:
+        print(box)
+        box_class = Box(blank_ir_3D, xyxy=box['coords'], confidence=1)
+        data = add_data_to_contour_info(box_class.x,box_class.y,2,box_class.h*box_class.w,0,self.dtCamera,header)
+        contour_info.append(data)
+
+    img = self.cvbridge.cv2_to_imgmsg(ir_yolo_img, 'bgr8') # might need to change to bgr for color cameras
+    
+    self.pubProcessedImage.publish(img)
+    #extract_and_publish_contours(self)
+    self.pubContours.publish( Contourlist(header = header, contours=contour_info) )  
         
