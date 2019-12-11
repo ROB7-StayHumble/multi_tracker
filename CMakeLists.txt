@@ -139,8 +139,8 @@ install(PROGRAMS
   nodes/image_processing.py
   # nodes/save_data_to_hdf5.py
   nodes/liveviewer.py
-  # nodes/delta_video_player.py
-  # nodes/delta_video_simplebuffer.py
+  nodes/delta_video_player.py
+  nodes/delta_video_simplebuffer.py
   # nodes/record_user_input.py
   nodes/republish_pref_obj_data.py
   # nodes/save_bag.py

@@ -59,7 +59,7 @@ def draw_trajectory(img, pts, color, thickness):
         except:
             pass
             print('could not draw trajectory line, length pts: ', len(pts), 'i: ', i)
-            
+
 # The main tracking class, a ROS node
 class LiveViewer:
     def __init__(self, nodenum):
@@ -92,28 +92,28 @@ class LiveViewer:
                     self.params[parameter] = rospy.get_param(p)
                 except:
                     print('Using default parameter: ', parameter, ' = ', value)
-                
+
         # initialize the node
         rospy.init_node('liveviewer_' + nodenum)
         self.nodename = rospy.get_name().rstrip('/')
         self.nodenum = nodenum
-        
+
         # initialize display
         self.window_name = 'liveviewer_' + nodenum
         self.subTrackedObjects = rospy.Subscriber('/multi_tracker/' + nodenum + '/tracked_objects', Trackedobjectlist, self.tracked_object_callback)
         self.subContours = rospy.Subscriber('/multi_tracker/' + nodenum + '/contours', Contourlist, self.contour_callback)
-            
+
         self.cvbridge = CvBridge()
         self.tracked_trajectories = {}
         self.contours = None
 
         self.window_initiated = False
-        
+
         # Subscriptions - subscribe to images, and tracked objects
-        self.image_mask = None 
+        self.image_mask = None
         sizeImage = 128+1024*1024*3 # Size of header + data.
         self.subImage = rospy.Subscriber(self.params['image_topic'], Image, self.image_callback, queue_size=5, buff_size=2*sizeImage, tcp_nodelay=True)
-
+        self.pubTrackerImage = rospy.Publisher('/multi_tracker/' + nodenum + '/tracker_image', Image, queue_size=20)
         # for adding images to background
         add_image_to_background_service_name = '/multi_tracker/' + self.nodenum + '/' + 'tracker/' + "add_image_to_background"
         rospy.wait_for_service(add_image_to_background_service_name)
@@ -125,11 +125,11 @@ class LiveViewer:
     def reset_background(self, service_call):
         self.reset_background_flag = True
         return 1
-        
+
     def tracked_object_callback(self, tracked_objects):
         for trajec in self.tracked_trajectories.values():
             trajec.popout = 1
-    
+
         for tracked_object in tracked_objects.tracked_objects:
             if tracked_object.persistence > self.params['min_persistence_to_draw']:
                 if tracked_object.objid not in self.tracked_trajectories.keys(): # create new object
@@ -138,11 +138,11 @@ class LiveViewer:
                 # update tracked objects
                 self.tracked_trajectories[tracked_object.objid].covariances.append(tracked_object.covariance)
                 self.tracked_trajectories[tracked_object.objid].positions.append([tracked_object.position.x, tracked_object.position.y])
-                
+
                 # if it is a young object, let it grow to length 100
                 if len(self.tracked_trajectories[tracked_object.objid].positions) < self.params['max_frames_to_draw']:
                     self.tracked_trajectories[tracked_object.objid].popout = 0
-        
+
         # cull old objects
         for objid, trajec in self.tracked_trajectories.items():
             if trajec.popout:
@@ -161,16 +161,16 @@ class LiveViewer:
         except CvBridgeError as e:
             rospy.logwarn ('Exception converting background image from ROS to opencv:  %s' % e)
             img = np.zeros((320,240))
-        
+
         self.imgScaled = img[self.params['roi_b']:self.params['roi_t'], self.params['roi_l']:self.params['roi_r']]
         self.shapeImage = self.imgScaled.shape # (height,width)
-        
+
         if self.params['circular_mask_x'] != 'none':
             if self.image_mask is None:
                 self.image_mask = np.zeros_like(self.imgScaled)
                 cv2.circle(self.image_mask,(self.params['circular_mask_x'], self.params['circular_mask_y']),int(self.params['circular_mask_r']),[1,1,1],-1)
             self.imgScaled = self.image_mask*self.imgScaled
-        
+
         # Image for display
         if self.params['camera_encoding'] == 'mono8':
             try:
@@ -182,8 +182,8 @@ class LiveViewer:
             self.imgOutput = self.imgScaled
         else:
             self.imgOutput = self.imgScaled
-        
-        
+
+
         # Draw ellipses from contours
         if self.contours is not None:
             for c, contour in enumerate(self.contours.contours):
@@ -192,51 +192,53 @@ class LiveViewer:
                 if contour.ecc != 0: # eccentricity of ellipse < 1 but > 0
                     a = np.sqrt( contour.area / (np.pi*contour.ecc) )
                     b = contour.ecc*a
-                else: # eccentricity of circle is 0 
+                else: # eccentricity of circle is 0
                     a = 1
                     b = 1
                 center = (int(contour.x), int(contour.y))
                 angle = int(contour.angle)
                 axes = (int(np.min([a,b])), int(np.max([a,b])))
                 cv2.ellipse(self.imgOutput, center, axes, angle, 0, 360, (0,255,0), 2 )
-        
+
         # Display the image | Draw the tracked trajectories
         for objid, trajec in self.tracked_trajectories.items():
             if len(trajec.positions) > 5:
                 draw_trajectory(self.imgOutput, trajec.positions, trajec.color, 2)
                 cv2.circle(self.imgOutput,(int(trajec.positions[-1][0]),int(trajec.positions[-1][1])),int(trajec.covariances[-1]),trajec.color,2)
-        cv2.imshow(self.window_name, self.imgOutput)
+        # cv2.imshow(self.window_name, self.imgOutput)
+        img = self.cvbridge.cv2_to_imgmsg(self.imgOutput, 'bgr8') # might need to change to bgr for color cameras
+        self.pubTrackerImage.publish(img)
 
-        if not self.window_initiated: # for some reason this approach works in opencv 3 instead of previous approach
-            cv2.setMouseCallback(self.window_name, self.on_mouse_click)
-            self.window_initiated = True
-        
+        # if not self.window_initiated: # for some reason this approach works in opencv 3 instead of previous approach
+            # cv2.setMouseCallback(self.window_name, self.on_mouse_click)
+            # self.window_initiated = True
+
         ascii_key = cv2.waitKey(1)
         if ascii_key != -1:
             self.on_key_press(ascii_key)
-        
+
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONUP:
             print('clicked pixel: ', [x, y])
-    
+
     def on_key_press(self, ascii_key):
         key = chr(ascii_key)
         if key == 'a':
             resp = self.add_image_to_background()
             print('added image to background')
-            
+
     def Main(self):
         while (not rospy.is_shutdown()):
             rospy.spin()
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
 #####################################################################################################
-    
+
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("--nodenum", type="str", dest="nodenum", default='1',
                         help="node number, for example, if running multiple tracker instances on one computer")
     (options, args) = parser.parse_args()
-    
+
     liveviewer = LiveViewer(options.nodenum)
     liveviewer.Main()
