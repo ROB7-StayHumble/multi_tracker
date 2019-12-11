@@ -144,7 +144,7 @@ class LiveViewer:
                     self.tracked_trajectories[tracked_object.objid].popout = 0
 
         # cull old objects
-        for objid, trajec in self.tracked_trajectories.items():
+        for objid, trajec in self.tracked_trajectories.copy().items():
             if trajec.popout:
                 trajec.positions.pop(0)
                 trajec.covariances.pop(0)
@@ -185,24 +185,24 @@ class LiveViewer:
 
 
         # Draw ellipses from contours
-        if self.contours is not None:
-            for c, contour in enumerate(self.contours.contours):
-                # b = contour.area / (np.pi*a)
-                # b = ecc*a
-                if contour.ecc != 0: # eccentricity of ellipse < 1 but > 0
-                    a = np.sqrt( contour.area / (np.pi*contour.ecc) )
-                    b = contour.ecc*a
-                else: # eccentricity of circle is 0
-                    a = 1
-                    b = 1
-                center = (int(contour.x), int(contour.y))
-                angle = int(contour.angle)
-                axes = (int(np.min([a,b])), int(np.max([a,b])))
-                cv2.ellipse(self.imgOutput, center, axes, angle, 0, 360, (0,255,0), 2 )
+        # if self.contours is not None:
+        #     for c, contour in enumerate(self.contours.contours):
+        #         # b = contour.area / (np.pi*a)
+        #         # b = ecc*a
+        #         if contour.ecc != 0: # eccentricity of ellipse < 1 but > 0
+        #             a = np.sqrt( contour.area / (np.pi*contour.ecc) )
+        #             b = contour.ecc*a
+        #         else: # eccentricity of circle is 0
+        #             a = 1
+        #             b = 1
+        #         center = (int(contour.x), int(contour.y))
+        #         angle = int(contour.angle)
+        #         axes = (int(np.min([a,b])), int(np.max([a,b])))
+        #         cv2.ellipse(self.imgOutput, center, axes, angle, 0, 360, (0,255,0), 2 )
 
         # Display the image | Draw the tracked trajectories
-        for objid, trajec in self.tracked_trajectories.items():
-            if len(trajec.positions) > 5:
+        for objid, trajec in self.tracked_trajectories.copy().items():
+            if len(trajec.positions) > 1:
                 draw_trajectory(self.imgOutput, trajec.positions, trajec.color, 2)
                 cv2.circle(self.imgOutput,(int(trajec.positions[-1][0]),int(trajec.positions[-1][1])),int(trajec.covariances[-1]),trajec.color,2)
         # cv2.imshow(self.window_name, self.imgOutput)
@@ -213,9 +213,9 @@ class LiveViewer:
             # cv2.setMouseCallback(self.window_name, self.on_mouse_click)
             # self.window_initiated = True
 
-        ascii_key = cv2.waitKey(1)
-        if ascii_key != -1:
-            self.on_key_press(ascii_key)
+        # ascii_key = cv2.waitKey(1)
+        # if ascii_key != -1:
+            # self.on_key_press(ascii_key)
 
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONUP:
