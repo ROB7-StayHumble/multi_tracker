@@ -140,7 +140,7 @@ class DataAssociator(object):
                 if objid not in objects_accounted_for:
                     if c not in contours_accounted_for:
                         contour = contourlist.contours[c]
-                        measurement = np.matrix([contour.x, contour.y, 0, contour.area, contour.angle]).T
+                        measurement = np.matrix([contour.x, contour.y]).T
                         tracked_object = self.tracked_objects[objid]
                         update_tracked_object(tracked_object, measurement, contourlist)
                         contours_accounted_for.append(c)
@@ -154,16 +154,12 @@ class DataAssociator(object):
         for c, contour in enumerate(contourlist.contours):
             if c not in contours_accounted_for:
 
-                obj_state = np.matrix([contour.x, 0, contour.y, 0, 0, 0, contour.area, 0, contour.angle, 0]).T # pretending 3-d tracking (z and zvel) for now
-                obj_measurement = np.matrix([contour.x, contour.y, 0, contour.area, contour.angle]).T
+                obj_state = np.matrix([contour.x, 0, contour.y, 0]).T # pretending 3-d tracking (z and zvel) for now
+                obj_measurement = np.matrix([contour.x, contour.y]).T
                 # If not associated with previous object, spawn a new object
                 new_obj = { 'objid':        self.current_objid,
-                            'statenames':   {   'position': [0, 2, 4],
-                                                'velocity': [1, 3, 5],
-                                                'size': 6,
-                                                'd_size': 7,
-                                                'angle': 0,
-                                                'd_angle': 0,
+                            'statenames':   {   'position': [0, 2],
+                                                'velocity': [1, 3]
                                             },
                             'state':        obj_state,
                             'measurement':  obj_measurement,
@@ -231,12 +227,14 @@ class DataAssociator(object):
                     data = Trackedobject()
                     data.header  = Header(stamp=t, frame_id=contourlist.header.frame_id)
                     p = np.array( tracked_object['state'][tracked_object['statenames']['position'],-1] ).flatten().tolist()
+                    print(p)
                     v = np.array( tracked_object['state'][tracked_object['statenames']['velocity'],-1] ).flatten().tolist()
-                    data.position       = Point( p[0], p[1], p[2] )
-                    data.velocity       = Vector3( v[0], v[1], v[2] )
-                    data.angle          = tracked_object['state'][tracked_object['statenames']['angle'],-1]
-                    data.size           = tracked_object['state'][tracked_object['statenames']['size'],-1]#np.linalg.norm(tracked_object['kalmanfilter'].P.diagonal())
-                    data.measurement    = Point( tracked_object['measurement'][0, -1], tracked_object['measurement'][1, -1], 0)
+                    print(v)
+                    data.position       = Point( p[0], p[1], 0)
+                    data.velocity       = Vector3( v[0], v[1], 0)
+                    # data.angle          = tracked_object['state'][tracked_object['statenames']['angle'],-1]
+                    # data.size           = tracked_object['state'][tracked_object['statenames']['size'],-1]#np.linalg.norm(tracked_object['kalmanfilter'].P.diagonal())
+                    data.measurement    = Point( tracked_object['measurement'][0, -1], tracked_object['measurement'][1, -1],0)
                     tracked_object_covariance = np.linalg.norm( (tracked_object['kalmanfilter'].H*tracked_object['kalmanfilter'].P).T*self.association_matrix )
                     data.covariance     = tracked_object_covariance # position covariance only
                     data.objid          = tracked_object['objid']
