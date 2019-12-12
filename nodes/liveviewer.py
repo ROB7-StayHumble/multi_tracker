@@ -145,6 +145,11 @@ class LiveViewer:
 
         # cull old objects
         for objid, trajec in self.tracked_trajectories.copy().items():
+            x = int(trajec.positions[-1][0])
+            y = int(trajec.positions[-1][1])
+            print("Circle coordinates:",x,y)
+            if x > 798 or x < 2:
+                del(self.tracked_trajectories[objid])
             if trajec.popout:
                 trajec.positions.pop(0)
                 trajec.covariances.pop(0)
